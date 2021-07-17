@@ -1,7 +1,5 @@
 ﻿using MEC;
 using System.Linq;
-using UnityEngine;
-using scp035.API;
 using System;
 using CISpy.API;
 using System.Collections.Generic;
@@ -15,19 +13,17 @@ namespace DCReplace
 	class EventHandlers
 	{
 		private bool isContain106;
-		private bool isRoundStarted = false;
+		private bool isRoundStarted;
 
-		private Player TryGet035() => Scp035Data.GetScp035();
+		private List<Player> TryGetSH() => SerpentsHand.API.GetSHPlayers();
 
-		private List<Player> TryGetSH() => SerpentsHand.API.SerpentsHand.GetSHPlayers();
+		private Dictionary<ReferenceHub, bool> TryGetSpies() =>  SpyData.GetSpies();
 
-		private Dictionary<Player, bool> TryGetSpies() => SpyData.GetSpies();
+		private void TrySpawnSpy(Player player, ReferenceHub dc, Dictionary<ReferenceHub, bool> spies) => SpyData.MakeSpy(player.ReferenceHub, spies[dc], false);
 
-		private void TrySpawnSpy(Player player, Player dc, Dictionary<Player, bool> spies) => SpyData.MakeSpy(player, spies[dc], false);
+		private void TrySpawnSH(Player player) => SerpentsHand.API.SpawnPlayer(player, false);
 
-		private void TrySpawnSH(Player player) => SerpentsHand.API.SerpentsHand.SpawnPlayer(player, false);
-
-		private void TrySpawn035(Player player) => Scp035Data.Spawn035(player);
+		private void TrySpawn035(Player player) => Scp035.API.Spawn035(player);
 
 		public void OnRoundStart()
 		{
@@ -39,18 +35,18 @@ namespace DCReplace
 
 		public void OnContain106(ContainingEventArgs ev) => isContain106 = true;
 
-		public void OnPlayerLeave(LeftEventArgs ev)
+		public void OnPlayerDestroying(DestroyingEventArgs ev)
 		{
-			if (!isRoundStarted || ev.Player.Role == RoleType.Spectator || ev.Player.Position.y < -1997 || (ev.Player.CurrentRoom.Zone == ZoneType.LightContainment && Map.IsLCZDecontaminated)) return;
+			if (!isRoundStarted || ev.Player.Role == RoleType.Spectator || ev.Player.IsInPocketDimension || ev.Player.CurrentRoom.Zone == ZoneType.LightContainment && Map.IsLCZDecontaminated) return;
 
-			bool is035 = false;
-			bool isSH = false;
+			var is035 = false;
+			var isSH = false;
 			if (isContain106 && ev.Player.Role == RoleType.Scp106) return;
-			Dictionary<Player, bool> spies = null;
+			Dictionary<ReferenceHub, bool> spies = null;
 			var role = Loader.Plugins.FirstOrDefault(pl => pl.Name == "EasyEvents")?.Assembly.GetType("EasyEvents.Util")?.GetMethod("GetRole")?.Invoke(null, new object[] {ev.Player});
 			try
 			{
-				is035 = ev.Player.Id == TryGet035()?.Id;
+				is035 = Scp035.API.IsScp035(ev.Player);
 			}
 			catch (Exception x)
 			{
@@ -75,7 +71,7 @@ namespace DCReplace
 				Log.Debug("CISpy is not installed, skipping method call...");
 			}
 			
-			Player player = Player.List.FirstOrDefault(x => x.Role == RoleType.Spectator && x.UserId != string.Empty && x.UserId != ev.Player.UserId && !x.IsOverwatchEnabled);
+			var player = Player.List.FirstOrDefault(x => x.Role == RoleType.Spectator && x.UserId != string.Empty && x.UserId != ev.Player.UserId && !x.IsOverwatchEnabled);
 			if (player != null)
 			{
 				if (isSH)
@@ -90,11 +86,11 @@ namespace DCReplace
 					}
 				}
 				else player.SetRole(ev.Player.Role);
-				if (spies != null && spies.ContainsKey(ev.Player))
+				if (spies != null && spies.ContainsKey(ev.Player.ReferenceHub))
 				{
 					try
 					{
-						TrySpawnSpy(player, ev.Player, spies);
+						TrySpawnSpy(player, ev.Player.ReferenceHub, spies);
 					}
 					catch (Exception x)
 					{
@@ -114,12 +110,12 @@ namespace DCReplace
 				}
 
 				// save info
-				Vector3 pos = ev.Player.Position;
+				var pos = ev.Player.Position;
 				var inventory = ev.Player.Inventory.items.Select(x => x.id).ToList();
-				float health = ev.Player.Health;
-				uint ammo1 = ev.Player.Ammo[(int)AmmoType.Nato556];
-				uint ammo2 = ev.Player.Ammo[(int)AmmoType.Nato762];
-				uint ammo3 = ev.Player.Ammo[(int)AmmoType.Nato9];
+				var health = ev.Player.Health;
+				var ammo1 = ev.Player.Ammo[(int)AmmoType.Nato556];
+				var ammo2 = ev.Player.Ammo[(int)AmmoType.Nato762];
+				var ammo3 = ev.Player.Ammo[(int)AmmoType.Nato9];
 
 				Timing.CallDelayed(0.3f, () =>
 				{
